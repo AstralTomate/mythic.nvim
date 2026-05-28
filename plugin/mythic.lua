@@ -130,6 +130,17 @@ vim.api.nvim_create_user_command("MythicSceneTest", function()
 	require("mythic.buffer").show(output)
 end, { nargs = 0 })
 
+-- MythicInit: mark a directory as campaign root and initialize .mythic/
+-- Usage: :MythicInit [path]  (defaults to cwd)
+vim.api.nvim_create_user_command("MythicInit", function(opts)
+	local arg = opts.fargs[1]
+	local dir = arg and vim.fn.fnamemodify(vim.fn.expand(arg), ":p"):gsub("[/\\]$", "")
+		or vim.fn.getcwd()
+	vim.fn.mkdir(dir .. "/.mythic", "p")
+	require("mythic.journal").reset()
+	vim.notify("Mythic campaign initialized in " .. dir, vim.log.levels.INFO)
+end, { nargs = "?", complete = "dir" })
+
 -- MythicCharacterAdd command
 vim.api.nvim_create_user_command("MythicCharacterAdd", function(opts)
 	local journal = require("mythic.journal")
@@ -180,4 +191,30 @@ vim.api.nvim_create_user_command("MythicThreadList", function()
 		on_remove = function(idx) journal.remove_thread(idx) end,
 		on_duplicate = function(idx) return journal.duplicate_thread(idx) end,
 	})
+end, { nargs = 0 })
+
+-- MythicCharacterRoll command (weighted random pick, result in floating window)
+vim.api.nvim_create_user_command("MythicCharacterRoll", function()
+	local journal = require("mythic.journal")
+	local entry = journal.roll_character()
+	if not entry then
+		vim.notify("No characters in list", vim.log.levels.WARN)
+		return
+	end
+	local result = "Character: " .. entry.name
+	print(result)
+	require("mythic.buffer").show(result)
+end, { nargs = 0 })
+
+-- MythicThreadRoll command (weighted random pick, result in floating window)
+vim.api.nvim_create_user_command("MythicThreadRoll", function()
+	local journal = require("mythic.journal")
+	local entry = journal.roll_thread()
+	if not entry then
+		vim.notify("No threads in list", vim.log.levels.WARN)
+		return
+	end
+	local result = "Thread: " .. entry.text
+	print(result)
+	require("mythic.buffer").show(result)
 end, { nargs = 0 })

@@ -100,10 +100,18 @@ All commands display results in both the message area and a centered floating wi
 | `j` / `k` | Navigate entries |
 | `a` | Add a new entry (prompts for name/text) |
 | `d` | Duplicate selected entry (up to ×3) |
+| `r` | Roulette roll — animated weighted random pick |
 | `x` | Remove one count from the selected entry (deletes at ×1) |
 | `q` / `Esc` | Close window |
 
 Entries can appear up to three times, reflecting Mythic's weight mechanic for random NPC/thread selection. The `[x2]` / `[x3]` suffix shows the current count.
+
+> [!NOTE]
+> **Campaign scope:** The plugin walks up from your working directory to find a campaign root — stopping at the first directory that contains `.mythic/` (explicit init) or `.git/` (version-controlled root). All subdirectories share the same journal. Lists are saved to `<root>/.mythic/journal.json` and persist between sessions.
+>
+> **Starting a new campaign:** Run `:MythicInit` in the campaign's root directory. This creates the `.mythic/` marker so subfolders are all recognized as part of the same campaign. Alternatively, if you already use `git init` for your notes, that directory is used automatically.
+>
+> Use `:MythicCharacterRoll` / `:MythicThreadRoll` to roll without opening the list window.
 
 ## Commands
 
@@ -119,10 +127,13 @@ Entries can appear up to three times, reflecting Mythic's weight mechanic for ra
 | `:MythicSceneTest` | Scene continuity test |
 | `:MythicEventFocus` | Random event focus |
 | `:MythicSceneAdjustment` | Scene adjustment |
+| `:MythicInit [path]` | Initialize a campaign in the given directory (defaults to cwd) |
 | `:MythicCharacterAdd <name>` | Add a character to the session list |
 | `:MythicCharacterList` | Open the Characters list window |
+| `:MythicCharacterRoll` | Weighted random pick from the Characters list |
 | `:MythicThreadAdd <text>` | Add a thread to the session list |
 | `:MythicThreadList` | Open the Threads list window |
+| `:MythicThreadRoll` | Weighted random pick from the Threads list |
 
 ## Examples
 
