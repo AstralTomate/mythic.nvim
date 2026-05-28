@@ -29,6 +29,17 @@ end, {
 
 vim.api.nvim_create_user_command("MythicEventFocus", function()
 	local result = require("mythic.random-event-focus").get_random_event_focus()
+
+	-- NPC Action/Negative/Positive → roll from Characters list (not "New NPC", that's a fresh character)
+	if result:find("NPC Action") or result:find("NPC Negative") or result:find("NPC Positive") then
+		local entry = require("mythic.journal").roll_character()
+		result = result .. "\n" .. (entry and ("Character: " .. entry.name) or "(No characters in list)")
+	-- Any Thread focus → roll from Threads list
+	elseif result:find("Thread") then
+		local entry = require("mythic.journal").roll_thread()
+		result = result .. "\n" .. (entry and ("Thread: " .. entry.text) or "(No threads in list)")
+	end
+
 	print(result)
 	require("mythic.buffer").show(result)
 end, {
