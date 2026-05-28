@@ -129,3 +129,55 @@ vim.api.nvim_create_user_command("MythicSceneTest", function()
 	print(output)
 	require("mythic.buffer").show(output)
 end, { nargs = 0 })
+
+-- MythicCharacterAdd command
+vim.api.nvim_create_user_command("MythicCharacterAdd", function(opts)
+	local journal = require("mythic.journal")
+	local name = table.concat(opts.fargs, " ")
+	local ok, msg = journal.add_character(name)
+	vim.notify(msg, ok and vim.log.levels.INFO or vim.log.levels.WARN)
+end, { nargs = "+" })
+
+-- MythicCharacterList command
+vim.api.nvim_create_user_command("MythicCharacterList", function()
+	local journal = require("mythic.journal")
+	require("mythic.list-window").show({
+		title = "Characters",
+		get_items = function()
+			local items = {}
+			for _, c in ipairs(journal.get_characters()) do
+				table.insert(items, { label = c.name, count = c.count })
+			end
+			return items
+		end,
+		on_add = function(name) return journal.add_character(name) end,
+		on_remove = function(idx) journal.remove_character(idx) end,
+		on_duplicate = function(idx) return journal.duplicate_character(idx) end,
+	})
+end, { nargs = 0 })
+
+-- MythicThreadAdd command
+vim.api.nvim_create_user_command("MythicThreadAdd", function(opts)
+	local journal = require("mythic.journal")
+	local text = table.concat(opts.fargs, " ")
+	local ok, msg = journal.add_thread(text)
+	vim.notify(msg, ok and vim.log.levels.INFO or vim.log.levels.WARN)
+end, { nargs = "+" })
+
+-- MythicThreadList command
+vim.api.nvim_create_user_command("MythicThreadList", function()
+	local journal = require("mythic.journal")
+	require("mythic.list-window").show({
+		title = "Threads",
+		get_items = function()
+			local items = {}
+			for _, t in ipairs(journal.get_threads()) do
+				table.insert(items, { label = t.text, count = t.count })
+			end
+			return items
+		end,
+		on_add = function(text) return journal.add_thread(text) end,
+		on_remove = function(idx) journal.remove_thread(idx) end,
+		on_duplicate = function(idx) return journal.duplicate_thread(idx) end,
+	})
+end, { nargs = 0 })

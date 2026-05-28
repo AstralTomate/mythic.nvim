@@ -93,6 +93,18 @@ All commands display results in both the message area and a centered floating wi
 > [!TIP]
 > Pressing `y` copies to both the system clipboard (`+` register) and Vim's default register (`"` register).
 
+### Characters & Threads list window keys
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate entries |
+| `a` | Add a new entry (prompts for name/text) |
+| `d` | Duplicate selected entry (up to ×3) |
+| `x` | Remove one count from the selected entry (deletes at ×1) |
+| `q` / `Esc` | Close window |
+
+Entries can appear up to three times, reflecting Mythic's weight mechanic for random NPC/thread selection. The `[x2]` / `[x3]` suffix shows the current count.
+
 ## Commands
 
 | Command | Description |
@@ -107,6 +119,10 @@ All commands display results in both the message area and a centered floating wi
 | `:MythicSceneTest` | Scene continuity test |
 | `:MythicEventFocus` | Random event focus |
 | `:MythicSceneAdjustment` | Scene adjustment |
+| `:MythicCharacterAdd <name>` | Add a character to the session list |
+| `:MythicCharacterList` | Open the Characters list window |
+| `:MythicThreadAdd <text>` | Add a thread to the session list |
+| `:MythicThreadList` | Open the Threads list window |
 
 ## Examples
 
@@ -255,7 +271,7 @@ Use `:MythicTables <name>` to access themed random tables. Each table contains 1
 Features planned based on the [Mythic GME 2 rulebook](https://www.drivethrurpg.com/en/product/422929/mythic-game-master-emulator-second-edition):
 
 - [ ] **NPC Tools** — NPC stat generation, behavior tables, identity, motivations
-- [ ] **Adventure Journal** — Structured scene-by-scene session logging with Threads and Characters lists
+- [x] **Adventure Journal** — Characters and Threads lists with interactive floating window (add, duplicate ×3, remove)
 - [ ] **Keyed Scenes** — Trigger-based scene events (counter, random, timer, conditional)
 - [ ] **Prepared Adventures** — Scaling tools for running published modules solo with Diminisher Value
 - [ ] **Thread Progress Track** — Progress tracking toward thread resolution
