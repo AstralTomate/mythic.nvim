@@ -82,7 +82,13 @@ Plug 'Django0033/mythic.nvim'
 
 All commands display results in both the message area and a centered floating window.
 
-### Keyboard shortcuts
+### Keymaps
+
+| Key | Action |
+|-----|--------|
+| `<leader>mct` | Pick a custom campaign table and roll on it |
+
+### Result window keys
 
 | Key | Action |
 |-----|--------|
@@ -145,6 +151,37 @@ A missing `(xN)` means ×1, and only the last bracket group counts — so `- Doc
 >
 > Use `:MythicCharacterRoll` / `:MythicThreadRoll` to roll without opening the list window.
 
+## Custom campaign tables
+
+Any markdown file in a `tables/` subfolder of the campaign becomes a roll table of its own. One result per line, and the file name is the table's name:
+
+```
+1. Journals/
+└── Aino the singing mage/
+    ├── Aino - Journal.md
+    ├── Mythic Lists.md
+    └── tables/
+        ├── Sanctum Rumors.md
+        └── Street Encounters.md
+```
+
+```markdown
+A portal flickers in the east wing
+The relics have been rearranged overnight
+Wong is asking about the missing tome
+```
+
+Press `<leader>mct` to pick a table and roll on it, or use `:MythicCustomTable [name]` — with no name it prompts, with a name it rolls straight away. `:MythicCustomTables` opens the folder, creating it if it does not exist.
+
+> [!NOTE]
+> **Writing tables:** Bullets, numbering and task boxes are all fine — `- A courier`, `1. A courier` and `- [ ] A courier` are read the same as a bare line. Frontmatter, headings, horizontal rules and blockquotes are skipped, so a table can be organised however suits you.
+>
+> **Weighting a result:** Repeat its line. Every line is one entry in the draw, so a result written three times is three times as likely. Unlike the Characters and Threads lists, there is no `(xN)` syntax here — a line is taken verbatim.
+>
+> Files are re-read on every roll, so edits take effect immediately.
+>
+> To use a different subfolder name, set `vim.g.mythic_tables_dir = "rolltables"`. Set `vim.g.mythic_no_default_keymaps = 1` to skip `<leader>mct` and map the commands yourself.
+
 ## Commands
 
 | Command | Description |
@@ -160,6 +197,8 @@ A missing `(xN)` means ×1, and only the last bracket group counts — so `- Doc
 | `:MythicEventFocus` | Random event focus |
 | `:MythicSceneAdjustment` | Scene adjustment |
 | `:MythicLists [dir]` | Open the campaign's `Mythic Lists.md`, creating it if needed |
+| `:MythicCustomTable [name]` | Roll on one of the campaign's `tables/*.md` (prompts if no name) |
+| `:MythicCustomTables` | Open the campaign's `tables/` folder |
 | `:MythicCharacterAdd <name>` | Add a character to the Characters list |
 | `:MythicCharacterList` | Open the Characters list window |
 | `:MythicCharacterRoll` | Weighted random pick from the Characters list |

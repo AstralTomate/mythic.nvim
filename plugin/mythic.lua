@@ -149,6 +149,25 @@ vim.api.nvim_create_user_command("MythicLists", function(opts)
 	vim.cmd("edit " .. vim.fn.fnameescape(path))
 end, { nargs = "?", complete = "dir" })
 
+-- MythicCustomTable: roll on one of the campaign's own tables, the markdown
+-- files in <campaign>/tables/. With no argument, pick a table first.
+-- Usage: :MythicCustomTable [name]
+vim.api.nvim_create_user_command("MythicCustomTable", function(opts)
+	require("mythic.custom-tables").prompt(table.concat(opts.fargs, " "))
+end, {
+	nargs = "*",
+	complete = function(lead)
+		return require("mythic.custom-tables").complete(lead)
+	end,
+})
+
+-- MythicCustomTables: open the campaign's tables/ folder
+vim.api.nvim_create_user_command("MythicCustomTables", function()
+	local dir = require("mythic.custom-tables").dir()
+	vim.fn.mkdir(dir, "p")
+	vim.cmd("edit " .. vim.fn.fnameescape(dir))
+end, { nargs = 0 })
+
 -- MythicCharacterAdd command
 vim.api.nvim_create_user_command("MythicCharacterAdd", function(opts)
 	local journal = require("mythic.journal")
@@ -228,3 +247,11 @@ vim.api.nvim_create_user_command("MythicThreadRoll", function()
 	print(result)
 	require("mythic.buffer").show(result)
 end, { nargs = 0 })
+
+-- Default keymaps. Set `vim.g.mythic_no_default_keymaps = 1` to skip these and
+-- map the commands yourself.
+if vim.g.mythic_no_default_keymaps ~= 1 then
+	vim.keymap.set("n", "<leader>mct", function()
+		require("mythic.custom-tables").prompt()
+	end, { desc = "Mythic: roll on a custom campaign table" })
+end

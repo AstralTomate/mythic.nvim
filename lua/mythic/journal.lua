@@ -17,16 +17,14 @@
 -- hold ordinary notes as well.
 local M = {}
 
+local campaign = require("mythic.campaign")
+
 local characters = {}
 local threads = {}
 local doc_lines = {}      -- the file as last read, used to preserve unmanaged content
 local current_dir = nil   -- resolved campaign folder
 local current_path = nil  -- resolved markdown document
 
--- Default file name; override with `vim.g.mythic_lists_file`.
-local function lists_filename()
-    return vim.g.mythic_lists_file or "Mythic Lists.md"
-end
 
 -- Section headings, matched case-insensitively.
 local SECTIONS = {
@@ -216,32 +214,6 @@ local function save()
     end
 end
 
--- The campaign folder is the folder of the file you are editing. If that folder
--- (or one above it) already has a lists document, that one wins, so notes in
--- subfolders still share the campaign's lists.
-local function buffer_dir()
-    if vim.bo.buftype ~= "" then return nil end
-    local name = vim.api.nvim_buf_get_name(0)
-    if name == "" then return nil end
-    return vim.fn.fnamemodify(name, ":p:h")
-end
-
-local function resolve_dir()
-    local start = buffer_dir()
-    if not start then return current_dir or vim.fn.getcwd() end
-
-    local home = vim.fn.expand("~")
-    local dir = start
-    while true do
-        if vim.fn.filereadable(dir .. "/" .. lists_filename()) == 1 then return dir end
-        if dir == home then break end
-        local parent = vim.fn.fnamemodify(dir, ":h")
-        if parent == dir then break end
-        dir = parent
-    end
-    return start
-end
-
 local function load_document()
     characters = {}
     threads = {}
@@ -256,9 +228,9 @@ end
 -- getting cache invalidation wrong -- mtime has one-second granularity and would
 -- silently miss a hand-edit made in the same second as one of our own writes.
 local function ensure_loaded()
-    local dir = resolve_dir()
+    local dir = campaign.dir()
     current_dir = dir
-    current_path = dir .. "/" .. lists_filename()
+    current_path = dir .. "/" .. campaign.lists_filename()
     load_document()
 end
 
@@ -277,8 +249,8 @@ end
 -- Create the document with empty sections if it does not exist yet.
 function M.ensure_document(dir)
     if dir then
-        current_dir = vim.fn.fnamemodify(vim.fn.expand(dir), ":p"):gsub("[/\\]$", "")
-        current_path = current_dir .. "/" .. lists_filename()
+        current_dir = campaign.set_dir(dir)
+        current_path = current_dir .. "/" .. campaign.lists_filename()
         load_document()
     else
         ensure_loaded()
