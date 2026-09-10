@@ -7,11 +7,13 @@
 --     ├─ The relics have been rearranged overnight
 --     └─ Wong is asking about the missing tome
 --
--- The table's name is its file name without the extension. Repeating a line
--- makes that result likelier, since every line is one entry in the draw.
+-- The table's name is its file name without the extension. A result can be
+-- weighted either by repeating its line or with a (x2) suffix, as in the
+-- Characters and Threads lists. Unlike those, there is no cap.
 local M = {}
 
 local campaign = require("mythic.campaign")
+local weight = require("mythic.weight")
 
 local function subfolder()
     return vim.g.mythic_tables_dir or "tables"
@@ -39,10 +41,12 @@ function M.list()
     return found, dir
 end
 
--- Every non-blank line is one result. Markdown scaffolding is skipped --
--- frontmatter, headings, horizontal rules -- and a leading list bullet, task
--- checkbox or "1." number is stripped, since results are naturally written as
--- a markdown list.
+-- Every non-blank line is one result, returned as { text, count } entries.
+-- Markdown scaffolding is skipped -- frontmatter, headings, horizontal rules,
+-- blockquotes -- and a leading list bullet, task checkbox or "1." number is
+-- stripped, since results are naturally written as a markdown list. A trailing
+-- (x2) weights the result, and repeated lines are merged and their weights
+-- summed.
 function M.entries(path)
     local lines = vim.fn.readfile(path)
     if not lines then return {} end
@@ -72,16 +76,25 @@ function M.entries(path)
             line = line:gsub("^[%-%*%+]%s+", "")
             line = line:gsub("^%d+[%.%)]%s+", "")
             line = line:gsub("^%[[ xX]%]%s*", "")
-            if line ~= "" then table.insert(entries, line) end
+            if line ~= "" then
+                local text, count = weight.split(line)
+                weight.accumulate(entries, text, count)
+            end
         end
     end
     return entries
 end
 
+-- Flat list of the table's result texts, for inspection.
+function M.results(path)
+    local out = {}
+    for _, entry in ipairs(M.entries(path)) do table.insert(out, entry.text) end
+    return out
+end
+
 function M.roll(path)
-    local entries = M.entries(path)
-    if #entries == 0 then return nil end
-    return entries[math.random(1, #entries)]
+    local entry = weight.pick(M.entries(path))
+    return entry and entry.text or nil
 end
 
 local function show(name, result)

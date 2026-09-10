@@ -18,6 +18,7 @@
 local M = {}
 
 local campaign = require("mythic.campaign")
+local weight = require("mythic.weight")
 
 local characters = {}
 local threads = {}
@@ -49,19 +50,6 @@ local function section_of(line)
     return nil
 end
 
--- A trailing weight, written (x2). Only the last bracket group on the line is
--- considered, so a name can carry a parenthesised note of its own --
--- "Doctor Strange (Mentor) (x2)" reads back as "Doctor Strange (Mentor)" at x2.
--- Braces and square brackets are accepted too, and the × sign needs its own
--- patterns because it is multibyte.
-local WEIGHT_PATTERNS = {}
-for _, pair in ipairs({ { "{", "}" }, { "%(", "%)" }, { "%[", "%]" } }) do
-    for _, sign in ipairs({ "[xX]", "×" }) do
-        table.insert(WEIGHT_PATTERNS,
-            "^(.-)%s*" .. pair[1] .. "%s*" .. sign .. "%s*(%d+)%s*" .. pair[2] .. "$")
-    end
-end
-
 -- Parse one bullet into text and weight. An optional task checkbox is stripped.
 -- Weight is clamped to Mythic's 1-3; a bullet with no weight is x1.
 local function parse_entry(line)
@@ -70,30 +58,12 @@ local function parse_entry(line)
     body = body:gsub("%s+$", "")
     if body == "" then return nil end
 
-    for _, pattern in ipairs(WEIGHT_PATTERNS) do
-        local text, n = body:match(pattern)
-        if text and text ~= "" then
-            return text, math.max(1, math.min(3, tonumber(n)))
-        end
-    end
-    return body, 1
+    local text, count = weight.split(body)
+    return text, math.min(3, count)
 end
 
 local function render_entry(text, count)
-    if count > 1 then return "- " .. text .. " (x" .. count .. ")" end
-    return "- " .. text
-end
-
--- Add to `list`, merging repeated identical entries (the physical Mythic idiom
--- of writing a name three times) up to x3.
-local function accumulate(list, text, count)
-    for _, entry in ipairs(list) do
-        if entry.text == text then
-            entry.count = math.min(3, entry.count + count)
-            return
-        end
-    end
-    table.insert(list, { text = text, count = count })
+    return "- " .. weight.join(text, count)
 end
 
 local function parse_document(lines)
@@ -110,7 +80,7 @@ local function parse_document(lines)
         elseif active then
             if line:match(BULLET) then
                 local text, count = parse_entry(line)
-                if text then accumulate(parsed[active], text, count) end
+                if text then weight.accumulate(parsed[active], text, count, 3) end
             elseif line:match("%S") then
                 table.insert(notes[active], line)
             end
@@ -266,15 +236,6 @@ local function find_by_text(list, text)
     return nil
 end
 
-local function weighted_pick(list)
-    if #list == 0 then return nil end
-    local pool = {}
-    for i, entry in ipairs(list) do
-        for _ = 1, entry.count do table.insert(pool, i) end
-    end
-    return list[pool[math.random(1, #pool)]]
-end
-
 local function add_entry(list, text, label)
     local idx = find_by_text(list, text)
     if idx then
@@ -333,7 +294,7 @@ end
 
 function M.roll_character()
     ensure_loaded()
-    return weighted_pick(characters)
+    return weight.pick(characters)
 end
 
 -- Threads
@@ -360,7 +321,7 @@ end
 
 function M.roll_thread()
     ensure_loaded()
-    return weighted_pick(threads)
+    return weight.pick(threads)
 end
 
 return M

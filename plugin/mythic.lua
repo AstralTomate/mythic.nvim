@@ -248,10 +248,14 @@ vim.api.nvim_create_user_command("MythicThreadRoll", function()
 	require("mythic.buffer").show(result)
 end, { nargs = 0 })
 
--- Default keymaps. Set `vim.g.mythic_no_default_keymaps = 1` to skip these and
--- map the commands yourself.
-if vim.g.mythic_no_default_keymaps ~= 1 then
-	vim.keymap.set("n", "<leader>mct", function()
-		require("mythic.custom-tables").prompt()
-	end, { desc = "Mythic: roll on a custom campaign table" })
-end
+-- MythicTablePick: choose one of the built-in Mythic tables and roll on it
+vim.api.nvim_create_user_command("MythicTablePick", function()
+	require("mythic.pick").builtin_table()
+end, { nargs = 0 })
+
+-- MythicFatePick: choose the odds, then roll on the Fate Chart
+vim.api.nvim_create_user_command("MythicFatePick", function()
+	require("mythic.pick").odds()
+end, { nargs = 0 })
+
+require("mythic.keymaps").setup()
