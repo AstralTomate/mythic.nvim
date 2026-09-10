@@ -106,10 +106,42 @@ All commands display results in both the message area and a centered floating wi
 
 Entries can appear up to three times, reflecting Mythic's weight mechanic for random NPC/thread selection. The `[x2]` / `[x3]` suffix shows the current count.
 
+### Where the lists live
+
+The two lists are stored in a plain markdown document called `Mythic Lists.md`, which sits in the same folder as the campaign's journal:
+
+```
+1. Journals/
+└── Aino the singing mage/
+    ├── Aino - Journal.md
+    ├── Mythic Lists.md      ← ## Threads / ## Characters
+    └── Bestiary.md
+```
+
+The document is the single source of truth — edit it by hand in Neovim, Obsidian or anything else, and the list windows pick the change up on the next open:
+
+```markdown
+## Threads
+
+- Find out who poisoned the well (x2)
+- Escape the sunken city
+
+## Characters
+
+- Sister Vell (x3)
+- The Tinker
+```
+
+A missing `(xN)` means ×1, and only the last bracket group counts — so `- Doctor Strange (Mentor, mostly absent) (x2)` keeps the note and reads as ×2. `{x2}` and `[x2]` are accepted on read as well. Repeating a line has the same effect as a weight, mirroring Mythic's physical lists where you write a name three times — `- The Tinker` three times is read as `- The Tinker (x3)`. Weights are clamped to ×3.
+
 > [!NOTE]
-> **Campaign scope:** The plugin walks up from your working directory to find a campaign root — stopping at the first directory that contains `.mythic/` (explicit init) or `.git/` (version-controlled root). All subdirectories share the same journal. Lists are saved to `<root>/.mythic/journal.json` and persist between sessions.
+> **Campaign scope:** The campaign is simply the folder of the file you are editing. If that folder or one above it already has a `Mythic Lists.md`, that document is used — so notes in subfolders share their campaign's lists, and each campaign folder keeps its own.
 >
-> **Starting a new campaign:** Run `:MythicInit` in the campaign's root directory. This creates the `.mythic/` marker so subfolders are all recognized as part of the same campaign. Alternatively, if you already use `git init` for your notes, that directory is used automatically.
+> **Starting a new campaign:** Run `:MythicLists` to create the document with empty sections and open it. Adding a character or thread creates it too, so there is nothing to initialize up front.
+>
+> **Other content is safe:** Only the `## Threads` and `## Characters` sections are rewritten. Frontmatter, other headings and prose inside those sections are preserved, so `Mythic Lists.md` can hold your own notes as well.
+>
+> To use a different file name, set `vim.g.mythic_lists_file = "Mythic.md"`.
 >
 > Use `:MythicCharacterRoll` / `:MythicThreadRoll` to roll without opening the list window.
 
@@ -127,11 +159,11 @@ Entries can appear up to three times, reflecting Mythic's weight mechanic for ra
 | `:MythicSceneTest` | Scene continuity test |
 | `:MythicEventFocus` | Random event focus |
 | `:MythicSceneAdjustment` | Scene adjustment |
-| `:MythicInit [path]` | Initialize a campaign in the given directory (defaults to cwd) |
-| `:MythicCharacterAdd <name>` | Add a character to the session list |
+| `:MythicLists [dir]` | Open the campaign's `Mythic Lists.md`, creating it if needed |
+| `:MythicCharacterAdd <name>` | Add a character to the Characters list |
 | `:MythicCharacterList` | Open the Characters list window |
 | `:MythicCharacterRoll` | Weighted random pick from the Characters list |
-| `:MythicThreadAdd <text>` | Add a thread to the session list |
+| `:MythicThreadAdd <text>` | Add a thread to the Threads list |
 | `:MythicThreadList` | Open the Threads list window |
 | `:MythicThreadRoll` | Weighted random pick from the Threads list |
 

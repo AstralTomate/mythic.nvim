@@ -1,67 +1,295 @@
--- Adventure Journal: Characters and Threads with per-project JSON persistence
+-- Adventure lists: Characters and Threads stored in a hand-editable markdown
+-- document that sits next to the campaign's journal.
+--
+-- The document is the single source of truth. It looks like this:
+--
+--     ## Threads
+--
+--     - Find out who poisoned the well (x2)
+--     - Escape the sunken city
+--
+--     ## Characters
+--
+--     - Sister Vell (x3)
+--     - The Tinker
+--
+-- Anything outside those two sections is preserved on write, so the file can
+-- hold ordinary notes as well.
 local M = {}
 
 local characters = {}
 local threads = {}
-local current_root = nil  -- resolved campaign root directory
+local doc_lines = {}      -- the file as last read, used to preserve unmanaged content
+local current_dir = nil   -- resolved campaign folder
+local current_path = nil  -- resolved markdown document
 
--- Walk up from cwd to find the campaign root.
--- Stops at the first directory that has .mythic/ (explicit init) or .git/ (vcs root).
--- Falls back to cwd if neither is found.
-local function find_project_root()
-    local cwd = vim.fn.getcwd()
-    local dir = cwd
-    while true do
-        if vim.fn.isdirectory(dir .. "/.mythic") == 1 then return dir end
-        if vim.fn.isdirectory(dir .. "/.git") == 1 then return dir end
-        local parent = vim.fn.fnamemodify(dir, ":h")
-        if parent == dir then return cwd end  -- reached fs root
-        dir = parent
+-- Default file name; override with `vim.g.mythic_lists_file`.
+local function lists_filename()
+    return vim.g.mythic_lists_file or "Mythic Lists.md"
+end
+
+-- Section headings, matched case-insensitively.
+local SECTIONS = {
+    { name = "threads", heading = "## Threads" },
+    { name = "characters", heading = "## Characters" },
+}
+
+local BULLET = "^%s*[%-%*%+]%s+"
+
+-- A heading that ends a `##` section (level 1 or 2; `###` stays inside).
+local function is_section_break(line)
+    return line:match("^#%s") ~= nil or line:match("^##%s") ~= nil
+end
+
+local function section_of(line)
+    local text = line:match("^##%s+(.-)%s*$")
+    if not text then return nil end
+    text = text:lower()
+    for _, s in ipairs(SECTIONS) do
+        if text == s.name then return s.name end
+    end
+    return nil
+end
+
+-- A trailing weight, written (x2). Only the last bracket group on the line is
+-- considered, so a name can carry a parenthesised note of its own --
+-- "Doctor Strange (Mentor) (x2)" reads back as "Doctor Strange (Mentor)" at x2.
+-- Braces and square brackets are accepted too, and the × sign needs its own
+-- patterns because it is multibyte.
+local WEIGHT_PATTERNS = {}
+for _, pair in ipairs({ { "{", "}" }, { "%(", "%)" }, { "%[", "%]" } }) do
+    for _, sign in ipairs({ "[xX]", "×" }) do
+        table.insert(WEIGHT_PATTERNS,
+            "^(.-)%s*" .. pair[1] .. "%s*" .. sign .. "%s*(%d+)%s*" .. pair[2] .. "$")
     end
 end
 
-local function journal_path()
-    return current_root .. "/.mythic/journal.json"
+-- Parse one bullet into text and weight. An optional task checkbox is stripped.
+-- Weight is clamped to Mythic's 1-3; a bullet with no weight is x1.
+local function parse_entry(line)
+    local body = line:gsub(BULLET, "", 1)
+    body = body:gsub("^%[[ xX]%]%s*", "")
+    body = body:gsub("%s+$", "")
+    if body == "" then return nil end
+
+    for _, pattern in ipairs(WEIGHT_PATTERNS) do
+        local text, n = body:match(pattern)
+        if text and text ~= "" then
+            return text, math.max(1, math.min(3, tonumber(n)))
+        end
+    end
+    return body, 1
+end
+
+local function render_entry(text, count)
+    if count > 1 then return "- " .. text .. " (x" .. count .. ")" end
+    return "- " .. text
+end
+
+-- Add to `list`, merging repeated identical entries (the physical Mythic idiom
+-- of writing a name three times) up to x3.
+local function accumulate(list, text, count)
+    for _, entry in ipairs(list) do
+        if entry.text == text then
+            entry.count = math.min(3, entry.count + count)
+            return
+        end
+    end
+    table.insert(list, { text = text, count = count })
+end
+
+local function parse_document(lines)
+    local parsed = { threads = {}, characters = {} }
+    local notes = { threads = {}, characters = {} }
+    local active = nil
+
+    for _, line in ipairs(lines) do
+        local section = section_of(line)
+        if section then
+            active = section
+        elseif active and is_section_break(line) then
+            active = nil
+        elseif active then
+            if line:match(BULLET) then
+                local text, count = parse_entry(line)
+                if text then accumulate(parsed[active], text, count) end
+            elseif line:match("%S") then
+                table.insert(notes[active], line)
+            end
+        end
+    end
+
+    return parsed, notes
+end
+
+-- Rebuild the file, replacing the managed sections in place and appending any
+-- that are missing. Non-bullet prose inside a section is kept above the list.
+local function render_document(lines, notes)
+    local out = {}
+    local seen = {}
+    local i = 1
+
+    local function emit_section(name)
+        local list = (name == "threads") and threads or characters
+        table.insert(out, "")
+        for _, note in ipairs(notes[name] or {}) do
+            table.insert(out, note)
+        end
+        if #(notes[name] or {}) > 0 then table.insert(out, "") end
+        for _, entry in ipairs(list) do
+            table.insert(out, render_entry(entry.text, entry.count))
+        end
+        table.insert(out, "")
+    end
+
+    while i <= #lines do
+        local line = lines[i]
+        local section = section_of(line)
+        if section then
+            -- A repeated heading is dropped: parsing already merged its entries
+            -- into the first occurrence, so keeping it would double them.
+            if not seen[section] then
+                seen[section] = true
+                table.insert(out, line)
+                emit_section(section)
+            end
+            -- skip the old body
+            i = i + 1
+            while i <= #lines and not (section_of(lines[i]) or is_section_break(lines[i])) do
+                i = i + 1
+            end
+        else
+            table.insert(out, line)
+            i = i + 1
+        end
+    end
+
+    for _, s in ipairs(SECTIONS) do
+        if not seen[s.name] then
+            if #out > 0 and out[#out]:match("%S") then table.insert(out, "") end
+            table.insert(out, s.heading)
+            emit_section(s.name)
+        end
+    end
+
+    -- collapse runs of blank lines and trim trailing ones
+    local tidy = {}
+    for _, line in ipairs(out) do
+        if line:match("%S") or (#tidy > 0 and tidy[#tidy]:match("%S")) then
+            table.insert(tidy, line)
+        end
+    end
+    while #tidy > 0 and not tidy[#tidy]:match("%S") do table.remove(tidy) end
+
+    return tidy
+end
+
+local function read_lines(path)
+    local f = io.open(path, "r")
+    if not f then return nil end
+    local lines = {}
+    for line in f:lines() do table.insert(lines, (line:gsub("\r$", ""))) end
+    f:close()
+    return lines
 end
 
 local function save()
-    if not current_root then return end
-    vim.fn.mkdir(current_root .. "/.mythic", "p")
-    local ok, json = pcall(vim.fn.json_encode, { characters = characters, threads = threads })
-    if not ok then return end
-    local f = io.open(journal_path(), "w")
-    if f then
-        f:write(json)
-        f:close()
+    if not current_path then return end
+    local base = doc_lines
+    local _, notes = parse_document(base)
+    local lines = render_document(base, notes)
+
+    local f = io.open(current_path, "w")
+    if not f then
+        vim.notify("Mythic: cannot write " .. current_path, vim.log.levels.ERROR)
+        return
+    end
+    f:write(table.concat(lines, "\n"), "\n")
+    f:close()
+
+    doc_lines = lines
+
+    -- keep an open buffer for the document in sync
+    local bufnr = vim.fn.bufnr(current_path)
+    if bufnr > 0 and vim.api.nvim_buf_is_loaded(bufnr) then
+        vim.cmd("silent! checktime " .. bufnr)
     end
 end
 
--- Reload when the resolved project root changes (cwd moved to a different campaign).
-local function ensure_loaded()
-    local root = find_project_root()
-    if root == current_root then return end
-    current_root = root
+-- The campaign folder is the folder of the file you are editing. If that folder
+-- (or one above it) already has a lists document, that one wins, so notes in
+-- subfolders still share the campaign's lists.
+local function buffer_dir()
+    if vim.bo.buftype ~= "" then return nil end
+    local name = vim.api.nvim_buf_get_name(0)
+    if name == "" then return nil end
+    return vim.fn.fnamemodify(name, ":p:h")
+end
+
+local function resolve_dir()
+    local start = buffer_dir()
+    if not start then return current_dir or vim.fn.getcwd() end
+
+    local home = vim.fn.expand("~")
+    local dir = start
+    while true do
+        if vim.fn.filereadable(dir .. "/" .. lists_filename()) == 1 then return dir end
+        if dir == home then break end
+        local parent = vim.fn.fnamemodify(dir, ":h")
+        if parent == dir then break end
+        dir = parent
+    end
+    return start
+end
+
+local function load_document()
     characters = {}
     threads = {}
-    local f = io.open(journal_path(), "r")
-    if not f then return end
-    local content = f:read("*a")
-    f:close()
-    local ok, data = pcall(vim.fn.json_decode, content)
-    if ok and type(data) == "table" then
-        characters = data.characters or {}
-        threads = data.threads or {}
+    doc_lines = read_lines(current_path) or {}
+    local parsed = parse_document(doc_lines)
+    threads = parsed.threads
+    characters = parsed.characters
+end
+
+-- Re-resolve the campaign folder and re-read the document. The file is small
+-- and every entry point is user-driven, so reading it each time is cheaper than
+-- getting cache invalidation wrong -- mtime has one-second granularity and would
+-- silently miss a hand-edit made in the same second as one of our own writes.
+local function ensure_loaded()
+    local dir = resolve_dir()
+    current_dir = dir
+    current_path = dir .. "/" .. lists_filename()
+    load_document()
+end
+
+-- Resolve the campaign folder now, while a real file buffer is still current.
+-- Commands call this before opening a floating window, since the float itself
+-- is a scratch buffer with no path of its own.
+function M.sync()
+    ensure_loaded()
+end
+
+function M.path()
+    ensure_loaded()
+    return current_path
+end
+
+-- Create the document with empty sections if it does not exist yet.
+function M.ensure_document(dir)
+    if dir then
+        current_dir = vim.fn.fnamemodify(vim.fn.expand(dir), ":p"):gsub("[/\\]$", "")
+        current_path = current_dir .. "/" .. lists_filename()
+        load_document()
+    else
+        ensure_loaded()
     end
+    if vim.fn.filereadable(current_path) == 0 then save() end
+    return current_path
 end
 
--- Force a root re-detection on the next access (used after :MythicInit).
-function M.reset()
-    current_root = nil
-end
-
-local function find_by_field(list, field, value)
+local function find_by_text(list, text)
     for i, entry in ipairs(list) do
-        if entry[field] == value then return i end
+        if entry.text == text then return i end
     end
     return nil
 end
@@ -75,43 +303,55 @@ local function weighted_pick(list)
     return list[pool[math.random(1, #pool)]]
 end
 
+local function add_entry(list, text, label)
+    local idx = find_by_text(list, text)
+    if idx then
+        if list[idx].count >= 3 then
+            return false, label .. " already at max (x3)"
+        end
+        list[idx].count = list[idx].count + 1
+        save()
+        return true, text .. " now at x" .. list[idx].count
+    end
+    table.insert(list, { text = text, count = 1 })
+    save()
+    return true, "Added " .. text
+end
+
+local function remove_entry(list, idx)
+    if not list[idx] then return false end
+    if list[idx].count > 1 then
+        list[idx].count = list[idx].count - 1
+    else
+        table.remove(list, idx)
+    end
+    save()
+    return true
+end
+
+local function duplicate_entry(list, idx)
+    if not list[idx] then return false end
+    if list[idx].count >= 3 then return false end
+    list[idx].count = list[idx].count + 1
+    save()
+    return true
+end
+
 -- Characters
 
 function M.add_character(name)
     ensure_loaded()
-    local idx = find_by_field(characters, "name", name)
-    if idx then
-        if characters[idx].count >= 3 then
-            return false, name .. " is already at max (x3)"
-        end
-        characters[idx].count = characters[idx].count + 1
-        save()
-        return true, name .. " now at x" .. characters[idx].count
-    end
-    table.insert(characters, { name = name, count = 1 })
-    save()
-    return true, "Added " .. name
+    return add_entry(characters, name, "Character")
 end
 
 function M.remove_character(idx)
     ensure_loaded()
-    if not characters[idx] then return false end
-    if characters[idx].count > 1 then
-        characters[idx].count = characters[idx].count - 1
-    else
-        table.remove(characters, idx)
-    end
-    save()
-    return true
+    return remove_entry(characters, idx)
 end
 
 function M.duplicate_character(idx)
     ensure_loaded()
-    if not characters[idx] then return false end
-    if characters[idx].count >= 3 then return false end
-    characters[idx].count = characters[idx].count + 1
-    save()
-    return true
+    return duplicate_entry(characters, idx)
 end
 
 function M.get_characters()
@@ -128,39 +368,17 @@ end
 
 function M.add_thread(text)
     ensure_loaded()
-    local idx = find_by_field(threads, "text", text)
-    if idx then
-        if threads[idx].count >= 3 then
-            return false, "Thread already at max (x3)"
-        end
-        threads[idx].count = threads[idx].count + 1
-        save()
-        return true, "Thread weight increased to x" .. threads[idx].count
-    end
-    table.insert(threads, { text = text, count = 1 })
-    save()
-    return true, "Thread added: " .. text
+    return add_entry(threads, text, "Thread")
 end
 
 function M.remove_thread(idx)
     ensure_loaded()
-    if not threads[idx] then return false end
-    if threads[idx].count > 1 then
-        threads[idx].count = threads[idx].count - 1
-    else
-        table.remove(threads, idx)
-    end
-    save()
-    return true
+    return remove_entry(threads, idx)
 end
 
 function M.duplicate_thread(idx)
     ensure_loaded()
-    if not threads[idx] then return false end
-    if threads[idx].count >= 3 then return false end
-    threads[idx].count = threads[idx].count + 1
-    save()
-    return true
+    return duplicate_entry(threads, idx)
 end
 
 function M.get_threads()

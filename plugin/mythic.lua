@@ -33,7 +33,7 @@ vim.api.nvim_create_user_command("MythicEventFocus", function()
 	-- NPC Action/Negative/Positive → roll from Characters list (not "New NPC", that's a fresh character)
 	if result:find("NPC Action") or result:find("NPC Negative") or result:find("NPC Positive") then
 		local entry = require("mythic.journal").roll_character()
-		result = result .. "\n" .. (entry and ("Character: " .. entry.name) or "(No characters in list)")
+		result = result .. "\n" .. (entry and ("Character: " .. entry.text) or "(No characters in list)")
 	-- Any Thread focus → roll from Threads list
 	elseif result:find("Thread") then
 		local entry = require("mythic.journal").roll_thread()
@@ -141,15 +141,12 @@ vim.api.nvim_create_user_command("MythicSceneTest", function()
 	require("mythic.buffer").show(output)
 end, { nargs = 0 })
 
--- MythicInit: mark a directory as campaign root and initialize .mythic/
--- Usage: :MythicInit [path]  (defaults to cwd)
-vim.api.nvim_create_user_command("MythicInit", function(opts)
-	local arg = opts.fargs[1]
-	local dir = arg and vim.fn.fnamemodify(vim.fn.expand(arg), ":p"):gsub("[/\\]$", "")
-		or vim.fn.getcwd()
-	vim.fn.mkdir(dir .. "/.mythic", "p")
-	require("mythic.journal").reset()
-	vim.notify("Mythic campaign initialized in " .. dir, vim.log.levels.INFO)
+-- MythicLists: open the campaign's Characters/Threads document, creating it
+-- with empty sections if it does not exist yet.
+-- Usage: :MythicLists [dir]  (defaults to the folder of the current file)
+vim.api.nvim_create_user_command("MythicLists", function(opts)
+	local path = require("mythic.journal").ensure_document(opts.fargs[1])
+	vim.cmd("edit " .. vim.fn.fnameescape(path))
 end, { nargs = "?", complete = "dir" })
 
 -- MythicCharacterAdd command
@@ -163,12 +160,13 @@ end, { nargs = "+" })
 -- MythicCharacterList command
 vim.api.nvim_create_user_command("MythicCharacterList", function()
 	local journal = require("mythic.journal")
+	journal.sync()
 	require("mythic.list-window").show({
 		title = "Characters",
 		get_items = function()
 			local items = {}
 			for _, c in ipairs(journal.get_characters()) do
-				table.insert(items, { label = c.name, count = c.count })
+				table.insert(items, { label = c.text, count = c.count })
 			end
 			return items
 		end,
@@ -189,6 +187,7 @@ end, { nargs = "+" })
 -- MythicThreadList command
 vim.api.nvim_create_user_command("MythicThreadList", function()
 	local journal = require("mythic.journal")
+	journal.sync()
 	require("mythic.list-window").show({
 		title = "Threads",
 		get_items = function()
@@ -212,7 +211,7 @@ vim.api.nvim_create_user_command("MythicCharacterRoll", function()
 		vim.notify("No characters in list", vim.log.levels.WARN)
 		return
 	end
-	local result = "Character: " .. entry.name
+	local result = "Character: " .. entry.text
 	print(result)
 	require("mythic.buffer").show(result)
 end, { nargs = 0 })
