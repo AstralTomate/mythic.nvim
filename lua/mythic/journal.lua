@@ -270,6 +270,44 @@ local function duplicate_entry(list, idx)
     return true
 end
 
+-- Rename the entry at `idx`, keeping its weight. A (x2) typed onto the new name
+-- sets the weight instead. Renaming onto an existing entry merges the two, as if
+-- the name had been added again, up to x3. Returns ok, message, and the entry's
+-- index afterwards so the list window can keep it selected.
+local function rename_entry(list, idx, new_text)
+    local entry = list[idx]
+    if not entry then return false, "Nothing to rename", idx end
+
+    local input = vim.trim(new_text or "")
+    local text, typed = weight.split(input)
+    text = vim.trim(text)
+    if text == "" then return false, "Name cannot be empty", idx end
+    -- split hands the input back untouched when there is no weight suffix
+    local count = text ~= input and math.min(3, typed) or entry.count
+
+    if text == entry.text and count == entry.count then
+        return true, nil, idx
+    end
+
+    local other = find_by_text(list, text)
+    if other and other ~= idx then
+        list[other].count = math.min(3, list[other].count + count)
+        table.remove(list, idx)
+        if other > idx then other = other - 1 end
+        save()
+        return true, "Merged into " .. text .. " (x" .. list[other].count .. ")", other
+    end
+
+    local old_text = entry.text
+    entry.text = text
+    entry.count = count
+    save()
+    if old_text == text then
+        return true, text .. " now at x" .. count, idx
+    end
+    return true, "Renamed " .. old_text .. " to " .. text, idx
+end
+
 -- Characters
 
 function M.add_character(name)
@@ -285,6 +323,11 @@ end
 function M.duplicate_character(idx)
     ensure_loaded()
     return duplicate_entry(characters, idx)
+end
+
+function M.rename_character(idx, text)
+    ensure_loaded()
+    return rename_entry(characters, idx, text)
 end
 
 function M.get_characters()
@@ -312,6 +355,11 @@ end
 function M.duplicate_thread(idx)
     ensure_loaded()
     return duplicate_entry(threads, idx)
+end
+
+function M.rename_thread(idx, text)
+    ensure_loaded()
+    return rename_entry(threads, idx, text)
 end
 
 function M.get_threads()

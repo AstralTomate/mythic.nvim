@@ -192,6 +192,7 @@ vim.api.nvim_create_user_command("MythicCharacterList", function()
 		on_add = function(name) return journal.add_character(name) end,
 		on_remove = function(idx) journal.remove_character(idx) end,
 		on_duplicate = function(idx) return journal.duplicate_character(idx) end,
+		on_rename = function(idx, text) return journal.rename_character(idx, text) end,
 	})
 end, { nargs = 0 })
 
@@ -219,6 +220,7 @@ vim.api.nvim_create_user_command("MythicThreadList", function()
 		on_add = function(text) return journal.add_thread(text) end,
 		on_remove = function(idx) journal.remove_thread(idx) end,
 		on_duplicate = function(idx) return journal.duplicate_thread(idx) end,
+		on_rename = function(idx, text) return journal.rename_thread(idx, text) end,
 	})
 end, { nargs = 0 })
 

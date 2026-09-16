@@ -113,12 +113,13 @@ Set `vim.g.mythic_no_default_keymaps = true` to skip these and map the commands 
 |-----|--------|
 | `j` / `k` | Navigate entries |
 | `a` | Add a new entry (prompts for name/text) |
+| `e` | Edit (rename) the selected entry — the prompt starts with its current name |
 | `d` | Duplicate selected entry (up to ×3) |
 | `r` | Roulette roll — animated weighted random pick |
 | `x` | Remove one count from the selected entry (deletes at ×1) |
 | `q` / `Esc` | Close window |
 
-Entries can appear up to three times, reflecting Mythic's weight mechanic for random NPC/thread selection. The `[x2]` / `[x3]` suffix shows the current count.
+Entries can appear up to three times, reflecting Mythic's weight mechanic for random NPC/thread selection. The `[x2]` / `[x3]` suffix shows the current count. Renaming keeps an entry's weight unless you type a new one (`Wong (x3)`), and renaming onto a name already in the list merges the two, up to ×3.
 
 ### Where the lists live
 

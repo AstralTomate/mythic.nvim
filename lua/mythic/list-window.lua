@@ -12,6 +12,7 @@ local HEIGHT = VISIBLE + 2  -- items + empty separator + help line
 --   on_add       function(text) -> ok, msg
 --   on_remove    function(idx)
 --   on_duplicate function(idx) -> bool
+--   on_rename    function(idx, text) -> ok, msg, new_idx
 function M.show(opts)
     local buf = vim.api.nvim_create_buf(false, true)
     local selected = 1
@@ -61,7 +62,7 @@ function M.show(opts)
             while #lines < VISIBLE do table.insert(lines, "") end
         end
 
-        local help = "  [a] Add  [d] Dup  [r] Roll  [x] Remove  [q] Close"
+        local help = " [a]Add [e]Edit [d]Dup [r]Roll [x]Del [q]Close"
         if n > VISIBLE then
             help = help .. "  (" .. active_idx .. "/" .. n .. ")"
         end
@@ -138,6 +139,21 @@ function M.show(opts)
                 selected = #opts.get_items()
                 render()
             end
+        end)
+    end, { buffer = buf, nowait = true })
+
+    -- [e] Edit: rename the selected entry, prefilled with its current name
+    vim.keymap.set("n", "e", function()
+        if animating then return end
+        local items = opts.get_items()
+        local item = items[selected]
+        if not item then return end
+        vim.ui.input({ prompt = "Rename: ", default = item.label }, function(input)
+            if not input then return end
+            local ok, msg, new_idx = opts.on_rename(selected, input)
+            if msg then vim.notify(msg, ok and vim.log.levels.INFO or vim.log.levels.WARN) end
+            if new_idx then selected = new_idx end
+            render()
         end)
     end, { buffer = buf, nowait = true })
 
